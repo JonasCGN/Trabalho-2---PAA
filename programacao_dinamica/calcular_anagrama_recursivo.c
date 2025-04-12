@@ -19,8 +19,10 @@ typedef struct {
 
 long long fatorialRec(int n, long long *memo) {
     if (n == 0 || n == 1) return 1;
-    if (memo[n] != 0) return memo[n];
-    return memo[n] = n * fatorialRec(n - 1, memo);
+    if (memo && memo[n] != 0) return memo[n];  // proteção contra ponteiro NULL
+    long long resultado = n * fatorialRec(n - 1, memo);
+    if (memo) memo[n] = resultado;
+    return resultado;
 }
 
 void contarFrequenciasRec(const char *palavra, int index, int freq[]) {
@@ -31,19 +33,19 @@ void contarFrequenciasRec(const char *palavra, int index, int freq[]) {
     contarFrequenciasRec(palavra, index + 1, freq);
 }
 
-long long calcularDivisorRec(int freq[], int index) {
+long long calcularDivisorRec(int freq[], int index, long long *memo) {
     if (index == ALPHABET_SIZE) return 1;
     long long atual = 1;
-    if (freq[index] > 1) atual = fatorialRec(freq[index], NULL);  // Calcula fatorial aqui
-    return atual * calcularDivisorRec(freq, index + 1);
+    if (freq[index] > 1) atual = fatorialRec(freq[index], memo);
+    return atual * calcularDivisorRec(freq, index + 1, memo);
 }
 
 long long calcularAnagramasRecursivo(const char *palavra) {
-    long long memo[MAX_FAT] = {0};  // Armazena resultados de fatoriais
+    long long memo[MAX_FAT] = {0};
     int freq[ALPHABET_SIZE] = {0};
     contarFrequenciasRec(palavra, 0, freq);
     int n = strlen(palavra);
-    return fatorialRec(n, memo) / calcularDivisorRec(freq, 0);
+    return fatorialRec(n, memo) / calcularDivisorRec(freq, 0, memo);
 }
 
 // =========================== FUNÇÃO PARA MEDIR MEMÓRIA ===========================
@@ -74,17 +76,25 @@ void ler_args(int argc, char *argv[], args *a) {
 void ler_palavras(char **palavras, int qtd, const char *path) {
     FILE *f = fopen(path, "r");
     if (!f) {
-        printf("Erro ao abrir arquivo: %s\n", path);
+        perror("Erro ao abrir o arquivo");
         exit(1);
     }
-    for (int i = 0; i < qtd; i++) {
-        palavras[i] = malloc(MAX_PALAVRA);
-        if (fscanf(f, "%s", palavras[i]) != 1) {
-            printf("Erro ao ler palavra %d\n", i + 1);
-            exit(1);
-        }
+
+    char buffer[MAX_PALAVRA];
+    int count = 0;
+
+    while (fgets(buffer, sizeof(buffer), f) && count < qtd) {
+        buffer[strcspn(buffer, "\n")] = '\0';
+        palavras[count] = malloc(strlen(buffer) + 1);
+        strcpy(palavras[count], buffer);
+        count++;
     }
+
     fclose(f);
+
+    if (count < qtd) {
+        printf("⚠️  Aviso: arquivo contém apenas %d palavras, mas %d foram solicitadas.\n", count, qtd);
+    }
 }
 
 // =========================== MAIN ===========================
@@ -95,14 +105,14 @@ int main(int argc, char *argv[]) {
 
     char **palavras = malloc(a.qtd_palavras * sizeof(char *));
     ler_palavras(palavras, a.qtd_palavras, a.path);
+    double tempo_rec = 0;
+    long long res_rec = 0;
+    long memoria_rec = 0;
 
     for (int i = 0; i < a.qtd_palavras; i++) {
-        double tempo_rec = 0;
-        long long res_rec = 0;
-        long memoria_rec = 0;
+        
 
         for (int t = 0; t < a.qtd_testes; t++) {
-            // Recursiva
             long mem_before = get_mem_kb();
             clock_t inicio = clock();
             res_rec = calcularAnagramasRecursivo(palavras[i]);
@@ -112,16 +122,14 @@ int main(int argc, char *argv[]) {
             memoria_rec += (mem_after - mem_before);
         }
 
-        tempo_rec /= a.qtd_testes;
-        memoria_rec /= a.qtd_testes;
-
-        printf("Palavra: %-20s | Rec: %.6fs, %ldKB",palavras[i], tempo_rec, memoria_rec);
-
-		printf("⚠️  Resultado divergente! Rec: %lld, Dyn: %lld\n", res_rec);
-
         if (a.mostrar_resultado)
-            printf("Anagramas: %lld\n", res_rec);
+            printf("Palavra: %-20s | Rec: %.6fs, %ldKB | Resultado: %lld\n", palavras[i], tempo_rec, memoria_rec,res_rec);
     }
+    
+    tempo_rec /= a.qtd_testes;
+    memoria_rec /= a.qtd_testes;
+
+    printf("Tempo:%.6fs Memoria:%ldKB\n",tempo_rec, memoria_rec);
 
     for (int i = 0; i < a.qtd_palavras; i++)
         free(palavras[i]);

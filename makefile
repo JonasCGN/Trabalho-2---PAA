@@ -1,7 +1,7 @@
-block_sort:
-	@gcc ordenacao/block_sort.c -o block_sort
-	@./block_sort $(FILE_PATH) $(SIZE_ARR) $(BLOCK_SIZE) $(SHOW_VECTOR_RESULT) $(QTD_TESTES)
+anagrama_dinamico:
+	@gcc programacao_dinamica/calcular_anagrama_dinamico.c -o anagrama_dinamico
+	@./anagrama_dinamico $(FILE_PATH) $(QTD_WORD) $(QTD_TEST) $(SHOW_RESULT)
 
-radix_sort:
-	@gcc ordenacao/radix_sort.c -o radix_sort
-	@./radix_sort $(FILE_PATH) $(SIZE_ARR) $(SHOW_VECTOR_RESULT) $(QTD_TESTES)
+anagrama_recursivo:
+	@gcc programacao_dinamica/calcular_anagrama_recursivo.c -o anagrama_recursivo
+	@./anagrama_recursivo $(FILE_PATH) $(QTD_WORD) $(QTD_TEST) $(SHOW_RESULT)

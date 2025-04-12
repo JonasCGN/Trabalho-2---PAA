@@ -1,7 +1,7 @@
 .venv
 venv
-block_sort
-radix_sort
+anagrama_dinamico
+anagrama_recursivo
 files/*
 imagem
 *.jpg

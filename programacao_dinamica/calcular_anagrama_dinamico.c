@@ -72,17 +72,31 @@ void ler_args(int argc, char *argv[], args *a) {
 void ler_palavras(char **palavras, int qtd, const char *path) {
     FILE *f = fopen(path, "r");
     if (!f) {
-        printf("Erro ao abrir arquivo: %s\n", path);
+        perror("Erro ao abrir o arquivo");
         exit(1);
     }
-    for (int i = 0; i < qtd; i++) {
-        palavras[i] = malloc(MAX_PALAVRA);
-        if (fscanf(f, "%s", palavras[i]) != 1) {
-            printf("Erro ao ler palavra %d\n", i + 1);
-            exit(1);
-        }
+
+    char buffer[MAX_PALAVRA];
+    int count = 0;
+
+    while (fgets(buffer, sizeof(buffer), f) && count < qtd) {
+        buffer[strcspn(buffer, "\n")] = '\0';  // Remove o '\n' do final
+        palavras[count] = malloc(strlen(buffer) + 1);
+        strcpy(palavras[count], buffer);
+        count++;
     }
+
     fclose(f);
+
+    if (count < qtd) {
+        printf("⚠️  Aviso: arquivo contém apenas %d palavras, mas %d foram solicitadas.\n", count, qtd);
+    }
+}
+
+void mostrar_palavras(char **palavras,int qtd){
+    for(int i=0;i<qtd;i++){
+        printf("%d - %s\n",i,palavras[i]);
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -91,31 +105,33 @@ int main(int argc, char *argv[]) {
 
     char **palavras = malloc(a.qtd_palavras * sizeof(char *));
     ler_palavras(palavras, a.qtd_palavras, a.path);
+    // mostrar_palavras(palavras,a.qtd_palavras);
+
+    double tempo_dyn = 0;
+    long long res_dyn = 0;
+    long memoria_dyn = 0;
 
     for (int i = 0; i < a.qtd_palavras; i++) {
-        double tempo_dyn = 0;
-        long long res_dyn = 0;
-        long memoria_dyn = 0;
+        
 
         for (int t = 0; t < a.qtd_testes; t++) {
-            // Dinâmica
-            mem_before = get_mem_kb();
-            inicio = clock();
+            long mem_before = get_mem_kb();
+            clock_t inicio = clock();
             res_dyn = calcularAnagramasDinamico(palavras[i]);
-            fim = clock();
-            mem_after = get_mem_kb();
+            clock_t fim = clock();
+            long mem_after = get_mem_kb();
             tempo_dyn += (double)(fim - inicio) / CLOCKS_PER_SEC;
             memoria_dyn += (mem_after - mem_before);
         }
-
-        memoria_rec /= a.qtd_testes;
-        memoria_dyn /= a.qtd_testes;
-
-        printf("Palavra: %-20s | Rec: %.6fs, %ldKB |  Resultado: %ld\n",tempo_dyn,memoria_dyn,res_dyn);
-
+        
         if (a.mostrar_resultado)
-            printf("Anagramas: %lld\n", res_dyn);
+            printf("Palavra: %-20s | Rec: %.6fs, %ldKB |  Resultado: %lld\n", palavras[i], tempo_dyn, memoria_dyn, res_dyn);
     }
+    
+    tempo_dyn /= a.qtd_testes;
+    memoria_dyn /= a.qtd_testes;
+
+    printf("Tempo:%.6fs Memoria:%ldKB\n",tempo_dyn, memoria_dyn);
 
     for (int i = 0; i < a.qtd_palavras; i++)
         free(palavras[i]);
