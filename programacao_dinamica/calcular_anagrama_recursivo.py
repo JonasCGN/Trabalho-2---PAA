@@ -132,7 +132,7 @@ def main():
     tempo_rec /= len(palavras)
     memoria_rec /= len(palavras)
     
-    print(f"Tempo:{tempo_rec:.6f}s Memoria:{memoria_rec:.2f}KB")
+    print(f"Tempo:{tempo_rec:.6f}s Memoria:{memoria_rec:.2f}KB Qtd:{len(palavras)}")
 
 if __name__ == "__main__":
     main()
