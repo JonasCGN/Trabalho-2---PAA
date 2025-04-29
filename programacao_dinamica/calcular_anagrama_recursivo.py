@@ -1,138 +1,124 @@
 import sys
 import time
-import tracemalloc  # Use tracemalloc instead of resource/psutil
-import psutil  # Added psutil for better memory measurement
-
-MAX_PALAVRA = 100
-ALPHABET_SIZE = 26
-MAX_FAT = 100
+import tracemalloc
+import gc
+from collections import Counter
 
 class Args:
-    def __init__(self, path, qtd_palavras, qtd_testes, mostrar_resultado):
+    def __init__(self, path, qtd_testes, mostrar_resultado):
         self.path = path
-        self.qtd_palavras = qtd_palavras
         self.qtd_testes = qtd_testes
         self.mostrar_resultado = mostrar_resultado
 
 # =========================== VERSÃO RECURSIVA ===========================
 
-def fatorial_rec(n, memo=None):
-    if memo is None:
-        memo = {}
+# Função recursiva para calcular fatorial
+def fatorial_rec(n):
     if n == 0 or n == 1:
         return 1
-    if n in memo:
-        return memo[n]
-    resultado = n * fatorial_rec(n - 1, memo)
-    memo[n] = resultado
-    return resultado
+    return n * fatorial_rec(n - 1)
 
+# Função recursiva para contar frequências de letras
 def contar_frequencias_rec(palavra, index, freq):
     if index >= len(palavra):
-        return
-    c = palavra[index]
-    if 'A' <= c <= 'Z':
-        c = chr(ord(c) + 32)  # Convert to lowercase
-    if 'a' <= c <= 'z':
-        freq[ord(c) - ord('a')] += 1
-    contar_frequencias_rec(palavra, index + 1, freq)
+        return freq
+    c = palavra[index].lower()
+    freq[c] += 1  
+    return contar_frequencias_rec(palavra, index + 1, freq)
 
-def calcular_divisor_rec(freq, index, memo=None):
-    if memo is None:
-        memo = {}
-    if index == ALPHABET_SIZE:
+# Função recursiva para calcular o denominador da fórmula
+def calcular_denominador_rec(freq_values, index):
+    if index >= len(freq_values):
         return 1
-    atual = 1
-    if freq[index] > 1:
-        atual = fatorial_rec(freq[index], memo)
-    return atual * calcular_divisor_rec(freq, index + 1, memo)
+    
+    count = freq_values[index]
+    fat = fatorial_rec(count)
+    return fat * calcular_denominador_rec(freq_values, index + 1)
 
+# Função principal para calcular anagramas de forma recursiva
 def calcular_anagramas_recursivo(palavra):
-    memo = {}
-    freq = [0] * ALPHABET_SIZE
-    contar_frequencias_rec(palavra, 0, freq)
-    n = len(palavra)
-    return fatorial_rec(n, memo) // calcular_divisor_rec(freq, 0, memo)
+    # Inicializa o contador de frequências e o memo para fatoriais
+    freq = Counter()
+    
+    # Conta a frequência de cada letra
+    freq = contar_frequencias_rec(palavra, 0, freq)
+    
+    # Calcula o numerador (fatorial do tamanho da palavra)
+    numerador = fatorial_rec(len(palavra))
+    
+    # Calcula o denominador (produto dos fatoriais das frequências)
+    denominador = calcular_denominador_rec(list(freq.values()), 0)
+    
+    # Retorna o resultado da fórmula
+    return numerador // denominador
 
-# =========================== FUNÇÃO PARA MEDIR MEMÓRIA ===========================
+# =========================== FUNÇÃO PARA MEDIR MEMÓRIA E TEMPO ===========================
 
-def measure_memory(func, *args):
+def measure_performance(func, *args):
+    gc.collect()  # Força coleta de lixo antes da medição
+    
+    # Mede tempo
+    inicio = time.time()
+    
+    # Mede memória
     tracemalloc.start()
     result = func(*args)
     current, peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
-    return result, peak / 1024  # Convert to KB
+    
+    # Calcula tempo
+    fim = time.time()
+    tempo = fim - inicio
+    
+    return result, tempo, peak / 1024  # Resultado, tempo em segundos, memória em KB
 
 # =========================== ARGUMENTOS E UTILITÁRIOS ===========================
 
 def ler_args(argc, argv):
-    if argc < 5:
-        print(f"Uso: {argv[0]} <arquivo.txt> <qtd_palavras> <qtd_testes> <mostrar_resultado>")
+    if argc < 4:
+        print(f"Uso: {argv[0]} <arquivo.txt> <qtd_testes> <mostrar_resultado>")
         sys.exit(1)
     
     path = argv[1]
-    qtd_palavras = int(argv[2])
-    qtd_testes = int(argv[3])
-    mostrar_resultado = int(argv[4])
-    
-    if qtd_palavras <= 0 or qtd_testes <= 0:
-        print("Parâmetros inválidos!")
-        sys.exit(1)
-    
-    return Args(path, qtd_palavras, qtd_testes, mostrar_resultado)
+    qtd_testes = int(argv[2])
+    mostrar_resultado = int(argv[3])
+    return Args(path, qtd_testes, mostrar_resultado)
 
-def ler_palavras(qtd, path):
+def ler_palavra(path):
     try:
         with open(path, 'r') as f:
-            palavras = []
-            for _ in range(qtd):
-                linha = f.readline().strip()
-                if not linha:
-                    break
-                palavras.append(linha)
-            
-            if len(palavras) < qtd:
-                print(f"⚠️  Aviso: arquivo contém apenas {len(palavras)} palavras, mas {qtd} foram solicitadas.")
-            
-            return palavras
-    except Exception as e:
-        print(f"Erro ao abrir o arquivo: {e}")
+            palavra = f.readline().strip()
+            return palavra
+    except FileNotFoundError:
+        print(f"Erro: arquivo {path} não encontrado.")
         sys.exit(1)
 
 # =========================== MAIN ===========================
 
 def main():
-    a = ler_args(len(sys.argv), sys.argv)
+    args = ler_args(len(sys.argv), sys.argv)
+    palavra = ler_palavra(args.path)
     
-    palavras = ler_palavras(a.qtd_palavras, a.path)
-    tempo_rec = 0
-    res_rec = 0
-    memoria_rec = 0
+    tempo_total = 0
+    memoria_total = 0
+    resultado = None
     
-    for i in range(len(palavras)):
-        tempo_palavra = 0
-        memoria_palavra = 0
-        
-        for t in range(a.qtd_testes):
-            inicio = time.time()
-            res_rec, mem_used = measure_memory(calcular_anagramas_recursivo, palavras[i])
-            fim = time.time()
-            
-            tempo_palavra += (fim - inicio)
-            memoria_palavra += mem_used
-        
-        tempo_palavra /= a.qtd_testes
-        memoria_palavra /= a.qtd_testes
-        tempo_rec += tempo_palavra
-        memoria_rec += memoria_palavra
-        
-        if a.mostrar_resultado:
-            print(f"Palavra: {palavras[i]:<20} | Rec: {tempo_palavra:.6f}s, {memoria_palavra:.2f}KB | Resultado: {res_rec}")
+    for i in range(args.qtd_testes):
+        res, tempo, memoria = measure_performance(calcular_anagramas_recursivo, palavra)
+        tempo_total += tempo
+        memoria_total += memoria
+        resultado = res
     
-    tempo_rec /= len(palavras)
-    memoria_rec /= len(palavras)
+    tempo_medio = tempo_total / args.qtd_testes
+    memoria_media = memoria_total / args.qtd_testes
     
-    print(f"Tempo:{tempo_rec:.6f}s Memoria:{memoria_rec:.2f}KB Qtd:{len(palavras)}")
+    if args.mostrar_resultado:
+        print(f"Palavra: {palavra}")
+        print(f"Quantidade de anagramas: {resultado}")
+        print(f"Tempo médio: {tempo_medio:.6f}s")
+        print(f"Memória média: {memoria_media:.2f} KB")
+    
+    print(f"Tempo:{tempo_medio:.6f}s Memoria:{memoria_media:.2f}KB QTD:{len(palavra)}")
 
 if __name__ == "__main__":
     main()
